@@ -1,0 +1,13 @@
+#!/bin/ksh
+
+daemon_user=_lightp
+daemon_execdir=/var/lightp
+daemon_flags="-d /dev/video0 -l 100"
+daemon=/var/lightp/lightp
+
+. /etc/rc.d/rc.subr
+
+rc_bg=YES
+rc_reload=NO
+
+rc_cmd $1

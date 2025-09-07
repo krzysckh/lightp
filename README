@@ -3,3 +3,5 @@ is it light in my room?
 requires openbsd video(1) and owl lisp
 
 $ make auto-install may not suit you.
+
+emacs plugin may also be installed from kelp: https://kelp.krzysckh.org

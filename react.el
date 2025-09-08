@@ -50,9 +50,10 @@
 
 (defun react/maybe-load (type)
   "Load a random theme of TYPE `type' unless a theme of this type is already loaded."
+  (react/log "[react] asked to load %s" type)
   (when (not (eq react/last-theme-type type))
     (setf react/last-theme-type type)
-    (funcall 'react/load-typed-theme-function type)))
+    (funcall react/load-typed-theme-function type)))
 
 (defun react/log (&rest r)
   "Print a message `R' when `react/verbose?' is non-nil."

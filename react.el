@@ -32,7 +32,12 @@
 ;;
 ;; This file is not part of GNU Emacs.
 
+
+;;; Commentary:
 ;;; Code:
+
+(require 'cl)
+(require 'network-stream)
 
 (defconst react/ip 7762)
 (defconst react/buffer-name " *React buffer*")
@@ -40,14 +45,23 @@
 
 (defvar react/last-theme-type nil)
 (defvar react/last-ip nil)
+(defvar react/verbose? nil)
+(defvar react/load-typed-theme-function 'rc/load-random-theme) ; λT load-theme of type T (T is one of 'light 'dark)
 
 (defun react/maybe-load (type)
+  "Load a random theme of TYPE `type' unless a theme of this type is already loaded."
   (when (not (eq react/last-theme-type type))
     (setf react/last-theme-type type)
-    (rc/load-random-theme type)))
+    (funcall 'react/load-typed-theme-function type)))
+
+(defun react/log (&rest r)
+  "Print a message `R' when `react/verbose?' is non-nil."
+  (when react/verbose?
+    (apply #'message r)))
 
 (defun react/connect (ip)
-  (message "[react] connecting to %s" ip)
+  "Connect to lightp server with hostname `IP'."
+  (react/log "[react] connecting to %s" ip)
   (setf react/last-ip ip)
   (open-network-stream
    react/process-name
@@ -60,16 +74,19 @@
     (add-hook 'after-change-functions 'react/buffer-change-hook nil t))))
 
 (defun react/buffer-change-hook (start end length)
+  "Hook ran after getting data from lightp server."
   (with-current-buffer react/buffer-name
     (let* ((data (buffer-substring-no-properties start end)))
-       (case (string-to-char data)
+       (cl-case (string-to-char data)
          (?a (react/maybe-load 'dark))
          (?b (react/maybe-load 'light))
-         (?R (message "[react] asked to reconnect")
+         (?R (react/log "[react] asked to reconnect")
              (when (process-live-p react/process-name)
                (kill-process react/process-name))
              (react/connect react/last-ip))
          (else
-          (message "[react] unknown command: " data))))))
+          (react/log "[react] unknown command: " data))))))
 
 (provide 'react)
+
+;;; react.el ends here

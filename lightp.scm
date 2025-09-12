@@ -1,10 +1,12 @@
 (import
  (owl toplevel)
- (owl args))
+ (owl args)
+ (prefix (ext sqlite io) s3/))
 
 (define *port* 7762)
+(define *db-name* "lightp.db")
 
-(define timeout 0.5)  ; timeout for checking light levels
+(define timeout 1)    ; timeout for checking light levels
 (define reconnect 30) ; ask client to reconnect after
 
 (define W 160)
@@ -55,7 +57,7 @@
             (write-bytes fd (state->bytes st))
             (close-port fd)
             (mail 'master (tuple 'drop-client! thrname)))
-           ((state new)
+           ((state new _)
             (if (not (eq? state new))
                 (begin
                   (write-bytes fd (state->bytes new))
@@ -77,9 +79,9 @@
          ((drop-client! c)
           (print "[master] dropping client " c)
           (loop (filter (λ (x) (not (equal? x c))) clients)))
-         ((announce state)
+         ((announce state value)
           (print "[master] announcing " state)
-          (for-each (λ (c) (mail c (tuple 'state state))) clients)
+          (for-each (λ (c) (mail c (tuple 'state state value))) (cons 'db clients))
           (loop clients))
          (else
           (loop clients)))))))
@@ -94,6 +96,25 @@
          (mail 'master (tuple 'add-client! (make-client fd ip)))
          (loop))))))
 
+(define (init-db! ptr)
+  (s3/execute ptr "create table if not exists avgs (id integer primary key, timestamp text, bavg text)"))
+
+(define (start-db-process!)
+  (let ((ptr (s3/open *db-name*)))
+    (init-db! ptr)
+    (thread
+     'db
+     (let loop ()
+       (lets ((who m (next-mail)))
+         (tuple-case m
+           ((state _ s)
+            (print "[db] saving " s)
+            (print "values: " (list (time-ms) (format #f "~,4f" s)))
+            (s3/execute ptr "insert into avgs (timestamp, bavg) values (?,?)" (list (str (time-ms)) (format #f "~,4f" s))))
+           (else
+            (print "[db] unknown message " m)))
+         (loop))))))
+
 (λ (args)
   (process-arguments
    (cdr args) command-line-rules "you lose"
@@ -103,6 +124,7 @@
        (print-rules command-line-rules)
        (halt 0))
 
+     (start-db-process!)
      (start-server!)
 
      (let* ((level (string->number (get opt 'level 'bug)))
@@ -113,7 +135,8 @@
                  (time (time-ms)))
              (if (> time (+ last (* 1000 timeout)))
                  (begin
-                   (when (bytevector? b)
-                     (mail 'master (tuple 'announce (if (> (bavg b) level) 'light 'dark))))
+                   (if-lets ((_ (bytevector? b))
+                             (avg (bavg b)))
+                     (mail 'master (tuple 'announce (if (> avg level) 'light 'dark) avg)))
                    (loop time))
                  (loop last)))))))))

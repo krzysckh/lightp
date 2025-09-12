@@ -1,10 +1,15 @@
 .SUFFIXES: .scm .c
+.PHONY: check-sqlite
 
 OL=ol
-CFLAGS != $(OL) -e '(if (has? *features* (quote sqlite)) "`pkg-config --cflags --libs sqlite3`" "")'
-CFLAGS += -static -lm -lpthread
+CFLAGS=`pkg-config --cflags sqlite3`
+LDFLAGS=-static `pkg-config --libs sqlite3` -lpthread -lm
 
-all: lightp
+all: check-sqlite lightp
+check-sqlite:
+	exit `$(OL) -e '(if (has? *features* (quote sqlite)) 0 1)'`
+lightp: lightp.o
+	$(CC) lightp.o -o $@ $(LDFLAGS)
 .scm.c:
 	$(OL) -x c -o $@ $<
 clean:

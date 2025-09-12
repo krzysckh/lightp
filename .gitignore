@@ -1,3 +1,4 @@
 *.~undo-tree~
-*.c
+*.[co]
 lightp
+*.db

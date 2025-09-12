@@ -1,6 +1,6 @@
 is it dark in my room?
 
-requires openbsd video(1) and owl lisp
+requires openbsd video(1) and owl lisp with sqlite extension enabled at compile time
 
 $ make auto-install may not suit you.
 

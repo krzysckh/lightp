@@ -2,6 +2,7 @@ use Modern::Perl;
 use Chart::Gnuplot;
 use DBI;
 use POSIX q(strftime);
+use Time::Local;
 
 # TODO: getopt
 our $DB_FILE       = defined $ARGV[0] ? $ARGV[0] : "lightp.db";
@@ -15,11 +16,11 @@ $sth->bind_param(1, $IGNORE_EVERY);
 my $r = $sth->execute or die $DBI::errstr;
 
 my (@xs, @ys);
-
-use Data::Printer;
+my @t = localtime(time);
+my $offset = timegm(@t) - timelocal(@t);
 
 while ($_ = $sth->fetch) {
-  push @xs, int(0+$_->[0]/1000);
+  push @xs, int(0+$_->[0]/1000) + $offset;
   push @ys, 0+$_->[1];
 }
 

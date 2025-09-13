@@ -6,8 +6,9 @@
 (define *port* 7762)
 (define *db-name* "lightp.db")
 
-(define timeout 1)    ; timeout for checking light levels
-(define reconnect 30) ; ask client to reconnect after
+(define timeout 1)             ; timeout for checking light levels
+(define reconnect 30)          ; ask client to reconnect after
+(define db-auto-save-every 60) ; auto save database ever _ seconds
 
 (define W 160)
 (define H 120)
@@ -99,21 +100,36 @@
 (define (init-db! ptr)
   (s3/execute ptr "create table if not exists avgs (id integer primary key, timestamp text, bavg text)"))
 
+(define (get-db)
+  (let ((db (s3/open *db-name*)))
+    (init-db! db)
+    (print "[db] got db at " db)
+    db))
+
 (define (start-db-process!)
-  (let ((ptr (s3/open *db-name*)))
-    (init-db! ptr)
-    (thread
-     'db
-     (let loop ()
-       (lets ((who m (next-mail)))
-         (tuple-case m
-           ((state _ s)
-            (print "[db] saving " s)
-            (print "values: " (list (time-ms) (format #f "~,4f" s)))
-            (s3/execute ptr "insert into avgs (timestamp, bavg) values (?,?)" (list (str (time-ms)) (format #f "~,4f" s))))
-           (else
-            (print "[db] unknown message " m)))
-         (loop))))))
+  (thread
+   'db-auto-save
+   (let loop ()
+     (sleep (* 1000 db-auto-save-every))
+     (mail 'db (tuple 'save!))
+     (loop)))
+  (thread
+   'db
+   (let loop ((ptr (get-db)))
+     (lets ((who m (next-mail)))
+       (tuple-case m
+         ((state _ s)
+          (print "[db] saving " s)
+          (print "values: " (list (time-ms) (format #f "~,4f" s)))
+          (s3/execute ptr "insert into avgs (timestamp, bavg) values (?,?)" (list (str (time-ms)) (format #f "~,4f" s)))
+          (loop ptr))
+         ((save!)
+          (print "[db] closing & re-opening database")
+          (s3/close ptr)
+          (loop (get-db)))
+         (else
+          (print "[db] unknown message " m)
+          (loop ptr)))))))
 
 (λ (args)
   (process-arguments

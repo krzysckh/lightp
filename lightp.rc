@@ -10,4 +10,8 @@ daemon=/var/lightp/lightp
 rc_bg=YES
 rc_reload=NO
 
+rc_stop() {
+  ps auxw | awk '$1 == "_lightp" { print $2 }' | xargs kill -9
+}
+
 rc_cmd $1

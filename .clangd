@@ -1,0 +1,2 @@
+CompileFlags:
+  Add: [ -I., -Wall, -Wextra, -std=c89, -DPRIM_CUSTOM ]

@@ -2,18 +2,18 @@
 .PHONY: check-sqlite
 
 OL=ol
-CFLAGS=`pkg-config --cflags sqlite3`
+CFLAGS=`pkg-config --cflags sqlite3` -I. -DPRIM_CUSTOM
 LDFLAGS=-static `pkg-config --libs sqlite3` -lpthread -lm
 
 all: check-sqlite lightp
 check-sqlite:
 	exit `$(OL) -e '(if (has? *features* (quote sqlite)) 0 1)'`
-lightp: lightp.o
-	$(CC) lightp.o -o $@ $(LDFLAGS)
-.scm.c:
+lightp: lightp.o ovm.h fast-video.c
+	$(CC) lightp.o $(CFLAGS) fast-video.c -o $@ $(LDFLAGS)
+.scm.c: ovm.h
 	$(OL) -x c -o $@ $<
 clean:
-	rm -f lightp
+	rm -f lightp lightp.c *.o
 auto-install: all
 	useradd -k /var/empty -L daemon -d /var/lightp -m -s /sbin/nologin _lightp || echo "user already exists. that's okay"
 	cp -v lightp /var/lightp/lightp
@@ -22,3 +22,5 @@ auto-install: all
 	cp -v lightp.rc /etc/rc.d/lightp
 	chmod +x /etc/rc.d/lightp
 	chown _lightp:_lightp /dev/video0
+ovm.h:
+	curl -Lo ovm.h https://gitlab.com/owl-lisp/owl/-/raw/master/c/ovm.h

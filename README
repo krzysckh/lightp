@@ -5,3 +5,5 @@ requires openbsd video(1) and owl lisp with sqlite extension enabled at compile 
 $ make auto-install may not suit you.
 
 emacs plugin may also be installed from kelp: https://kelp.krzysckh.org
+
+C mode includes speedups gained by not allocating a 160*120*2 bytevector 15 times per second

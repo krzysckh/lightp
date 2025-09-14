@@ -1,5 +1,9 @@
 *.~undo-tree~
-*.[co]
+lightp.c
+*.o
 lightp
 *.db
 *.png
+ovm.h
+*.core
+.gdb_history

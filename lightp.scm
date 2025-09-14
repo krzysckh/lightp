@@ -10,10 +10,18 @@
 (define reconnect 30)          ; ask client to reconnect after
 (define db-auto-save-every 60) ; auto save database ever _ seconds
 
-(define W 160)
-(define H 120)
-(define *bufsiz* (* W H 2))
-(define *cmd* "video -e yuy2 -r 1 -s ~ax~a -f ~a -o -")
+(define prim!
+  (case-lambda
+   ((n a b c)  (sys-prim n a b c))
+   ((n a b)    (sys-prim n a b #f))
+   ((n a)      (sys-prim n a #f #f))
+   ((n)        (sys-prim n #f #f #f))))
+
+(define (init-fast! dev)
+  (prim! 1000 (c-string dev)))
+
+(define (query-average)
+  (prim! 1001))
 
 (define command-line-rules
   (cl-rules
@@ -21,17 +29,6 @@
      (level "-l" "--level"  has-arg comment "Light tuning level (0-255)" default "128")
      (dev   "-d" "--device" has-arg comment "Camera device"              default "/dev/video1")
      )))
-
-(define (bavg b)
-  (let* ((len (bytevector-length b))
-         (sum
-          (let loop ((sum 0) (n 0))
-            (if (>= n len)
-                sum
-                (loop
-                 (+ sum (band #xf0 (bytevector-u8-ref b n)))
-                 (+ n 2))))))
-    (/ sum (* 160 120))))
 
 (define (state->bytes state)
   (list
@@ -121,10 +118,11 @@
          ((state _ s)
           (print "[db] saving " s)
           (print "values: " (list (time-ms) (format #f "~,4f" s)))
-          (s3/execute ptr "insert into avgs (timestamp, bavg) values (?,?)" (list (str (time-ms)) (format #f "~,4f" s)))
-          (loop ptr))
+          (if (s3/execute ptr "insert into avgs (timestamp, bavg) values (?,?)" (list (str (time-ms)) (format #f "~,4f" s)))
+              (loop ptr)
+              (loop (get-db))))
          ((save!)
-          (print "[db] closing & re-opening database")
+          (print "[db] closing & re-opening database as per 'save!")
           (s3/close ptr)
           (loop (get-db)))
          (else
@@ -140,19 +138,14 @@
        (print-rules command-line-rules)
        (halt 0))
 
+     (print "starting w/ fast, ret=" (init-fast! (get opt 'dev "bug, beware")))
+
      (start-db-process!)
      (start-server!)
 
-     (let* ((level (string->number (get opt 'level 'bug)))
-            (cmd (format #f *cmd* W H (get opt 'dev 'bug))))
-       (lets ((r _ (popen cmd)))
-         (let loop ((last (time-ms)))
-           (let ((b (try-get-block r *bufsiz* #t))
-                 (time (time-ms)))
-             (if (> time (+ last (* 1000 timeout)))
-                 (begin
-                   (if-lets ((_ (bytevector? b))
-                             (avg (bavg b)))
-                     (mail 'master (tuple 'announce (if (> avg level) 'light 'dark) avg)))
-                   (loop time))
-                 (loop last)))))))))
+     (let* ((level (string->number (get opt 'level 'bug))))
+       (let loop ()
+         (let ((avg (query-average)))
+           (mail 'master (tuple 'announce (if (> avg level) 'light 'dark) avg))
+           (sleep (* 1000 timeout))
+           (loop)))))))

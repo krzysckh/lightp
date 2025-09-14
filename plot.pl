@@ -1,6 +1,7 @@
 use Modern::Perl;
 use Chart::Gnuplot;
 use DBI;
+use DBD::SQLite;
 use POSIX q(strftime);
 use Time::Local;
 
@@ -9,7 +10,9 @@ our $DB_FILE       = defined $ARGV[0] ? $ARGV[0] : "lightp.db";
 our $IGNORE_EVERY  = defined $ARGV[1] ? int($ARGV[1]) : 1;
 our $TARGET        = defined $ARGV[2] ? $ARGV[2] : "plot.png";
 
-my $dbh = DBI->connect("dbi:SQLite:dbname=$DB_FILE", "", "");
+my $dbh = DBI->connect("dbi:SQLite:dbname=$DB_FILE", "", "", {
+  sqlite_open_flags => DBD::SQLite::OPEN_READONLY
+});
 
 my $sth = $dbh->prepare(q(select timestamp, bavg from avgs where id % ? = 0;));
 $sth->bind_param(1, $IGNORE_EVERY);

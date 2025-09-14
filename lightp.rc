@@ -4,6 +4,7 @@ daemon_user=_lightp
 daemon_execdir=/var/lightp
 daemon_flags="-d /dev/video0 -l 80"
 daemon=/var/lightp/lightp
+# daemon_logger="daemon.info"
 
 . /etc/rc.d/rc.subr
 

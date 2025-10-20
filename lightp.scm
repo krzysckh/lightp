@@ -39,12 +39,10 @@
      (else   0))))
 
 (define (make-client fd ip)
-  (print "Making client with fd " fd)
   (let ((thrname (string->symbol (str "client@" ip "-" (time-ns)))))
     (thread
      (begin
        (sleep (* 1000 reconnect))
-       (print "will ask to recon")
        (mail thrname (tuple 'kys! 'recon))))
     (thread
      thrname
@@ -78,7 +76,7 @@
           (print "[master] dropping client " c)
           (loop (filter (λ (x) (not (equal? x c))) clients)))
          ((announce state value)
-          (print "[master] announcing " state)
+          ; (print "[master] announcing " state)
           (for-each (λ (c) (mail c (tuple 'state state value))) (cons 'db clients))
           (loop clients))
          (else
@@ -100,7 +98,7 @@
 (define (get-db)
   (let ((db (s3/open *db-name*)))
     (init-db! db)
-    (print "[db] got db at " db)
+    ; (print "[db] got db at " db)
     db))
 
 (define (start-db-process!)
@@ -112,22 +110,21 @@
      (loop)))
   (thread
    'db
-   (let loop ((ptr (get-db)))
+   (let loop ((al #n) (ptr (get-db)))
      (lets ((who m (next-mail)))
        (tuple-case m
          ((state _ s)
-          (print "[db] saving " s)
-          (print "values: " (list (time-ms) (format #f "~,4f" s)))
-          (if (s3/execute ptr "insert into avgs (timestamp, bavg) values (?,?)" (list (str (time-ms)) (format #f "~,4f" s)))
-              (loop ptr)
-              (loop (get-db))))
+          (loop (cons s al) ptr))
          ((save!)
-          (print "[db] closing & re-opening database as per 'save!")
+          (print "[db] saving " (avg al))
+          (when (not (null? al))
+            (s3/execute ptr "insert into avgs (timestamp, bavg) values (?,?)" (list (str (time-ms)) (format #f "~,4f" (avg al)))))
+          ; (print "[db] closing & re-opening database as per 'save!")
           (s3/close ptr)
-          (loop (get-db)))
+          (loop #n (get-db)))
          (else
           (print "[db] unknown message " m)
-          (loop ptr)))))))
+          (loop al ptr)))))))
 
 (λ (args)
   (process-arguments
